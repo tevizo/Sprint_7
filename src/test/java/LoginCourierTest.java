@@ -1,6 +1,8 @@
+import io.qameta.allure.junit4.DisplayName;
 import io.restassured.RestAssured;
 import io.restassured.filter.log.RequestLoggingFilter;
 import io.restassured.filter.log.ResponseLoggingFilter;
+import io.restassured.response.ValidatableResponse;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -12,6 +14,7 @@ import ru.yandex.praktikum.model.CourierGenerator;
 import static java.net.HttpURLConnection.*;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 public class LoginCourierTest {
     private CourierSteps courierSteps;
@@ -33,51 +36,105 @@ public class LoginCourierTest {
     }
 
     @Test
+    @DisplayName("Courier can login")
     public void courierCanLogin() {
         Courier courier = CourierGenerator.getRandom();
-        courierSteps.create(courier).assertThat().statusCode(HTTP_CREATED);
-        courierId = courierSteps.login(CourierCredentials.from(courier)).assertThat().statusCode(HTTP_OK).body("id", notNullValue()).extract().path("id");
+        ValidatableResponse createResponse = courierSteps.create(courier);
+
+        courierId = courierSteps.login(CourierCredentials.from(courier)).extract().path("id");
+        boolean isValueTrue = createResponse.extract().path("ok");
+
+        assertThat("Creating Failed", isValueTrue);
+        assertThat(courierId, is(notNullValue()));
     }
 
     @Test
+    @DisplayName("Courier login with all values")
     public void courierLoginWithAllValues() {
-        Courier courier = CourierGenerator.getRandom();
-        courierSteps.create(courier).assertThat().statusCode(HTTP_CREATED);
-        courierId = courierSteps.login(CourierCredentials.from(courier)).assertThat().statusCode(HTTP_OK).body("id", notNullValue()).extract().path("id");
+        Courier courier = new Courier("Tesonwdveiuvbf", "rwthwrth", "wrthwrth45");
+        CourierCredentials courierCredentials = new CourierCredentials("Tesonwdveiuvbf", "rwthwrth");
+        ValidatableResponse createResponse = courierSteps.create(courier);
+
+        courierId = courierSteps.login(courierCredentials).extract().path("id");
+        boolean isValueTrue = createResponse.extract().path("ok");
+
+        assertThat("Creating Failed", isValueTrue);
+        assertThat(courierId, is(notNullValue()));
     }
+
     @Test
+    @DisplayName("Error if incorrect password")
     public void errorIfIncorrectPassword() {
-        Courier courier = new Courier("Tesonwdveiuvb", "rwthwrth", "wrthwrth45");
-        CourierCredentials courierCredentials = new CourierCredentials("Tesonwdveiuvb", "test");
-        courierSteps.create(courier).assertThat().statusCode(HTTP_CREATED);
-        courierSteps.login(courierCredentials).assertThat().statusCode(HTTP_NOT_FOUND).body("message", is("Учетная запись не найдена"));
+        Courier courier = new Courier("Tesonwdveiuvbm", "rwthwrth", "wrthwrth45");
+        CourierCredentials courierCredentials = new CourierCredentials("Tesonwdveiuvbm", "test");
+        ValidatableResponse createResponse = courierSteps.create(courier);
+        ValidatableResponse loginResponse = courierSteps.login(courierCredentials);
         courierId = courierSteps.login(CourierCredentials.from(courier)).extract().path("id");
 
+        boolean isValueTrue = createResponse.extract().path("ok");
+        String messageLoginResponse = loginResponse.extract().path("message").toString();
+        int statusCode = loginResponse.extract().statusCode();
+
+        assertThat("Creating Failed", isValueTrue);
+        assertThat(messageLoginResponse, is("Учетная запись не найдена"));
+        assertThat(statusCode, is(HTTP_NOT_FOUND));
     }
+
     @Test
+    @DisplayName("Error if login value is null")
     public void errorIfLoginValueIsNull() {
         Courier courier = new Courier("ThisWillBeNull", "password", "wrthwrth45");
         CourierCredentials courierCredentials = new CourierCredentials(null, "password");
-        courierSteps.create(courier).assertThat().statusCode(HTTP_CREATED);
-        courierSteps.login(courierCredentials).assertThat().statusCode(HTTP_BAD_REQUEST).body("message", is("Недостаточно данных для входа"));
+        ValidatableResponse createResponse = courierSteps.create(courier);
+        ValidatableResponse loginResponse = courierSteps.login(courierCredentials);
         courierId = courierSteps.login(CourierCredentials.from(courier)).extract().path("id");
+
+        boolean isValueTrue = createResponse.extract().path("ok");
+        String messageLoginResponse = loginResponse.extract().path("message").toString();
+        int statusCode = loginResponse.extract().statusCode();
+
+        assertThat("Creating Failed", isValueTrue);
+        assertThat(messageLoginResponse, is("Недостаточно данных для входа"));
+        assertThat(statusCode, is(HTTP_BAD_REQUEST));
     }
+
     @Test
+    @DisplayName("Error if non existing courier")
     public void errorIfNonExistingCourier() {
-        Courier courier = new Courier("ThisWillBeNew", "password", "wrthwrth45");
-        CourierCredentials courierCredentials = new CourierCredentials("ThisWillBeNew", "password");
-        courierSteps.create(courier).assertThat().statusCode(HTTP_CREATED);
-        courierId = courierSteps.login(courierCredentials).extract().path("id");
-        courierSteps.delete(courierId);
-        courierSteps.login(courierCredentials).assertThat().statusCode(HTTP_NOT_FOUND).and().body("message", is("Учетная запись не найдена"));;
+        Courier courier = new Courier("ThisWillBeNull1", "password", "wrthwrth45");
+        CourierCredentials loginCourierCred = new CourierCredentials("ThisWillBeNull1", "password");
+        ValidatableResponse createResponse = courierSteps.create(courier);
+        ValidatableResponse loginResponse = courierSteps.login(loginCourierCred);
+        courierId = courierSteps.login(loginCourierCred).extract().path("id");
+        ValidatableResponse deleteResponse = courierSteps.delete(courierId);
+        ValidatableResponse loginNonExistingResponse = courierSteps.login(loginCourierCred);
+
+        boolean isValueTrue = createResponse.extract().path("ok");
+        int statusCodeLogin = loginResponse.extract().statusCode();
+        int statusCodeDelete = deleteResponse.extract().statusCode();
+        int statusCodeLoginFailed = loginNonExistingResponse.extract().statusCode();
+        String messageNonExistingLogin = loginNonExistingResponse.extract().path("message").toString();
+
+        assertThat("Creating Failed", isValueTrue);
+        assertThat(statusCodeLogin, is(HTTP_OK));
+        assertThat(statusCodeDelete, is(HTTP_OK));
+        assertThat(statusCodeLoginFailed, is(HTTP_NOT_FOUND));
+        assertThat(messageNonExistingLogin, is("Учетная запись не найдена"));
     }
 
     @Test
+    @DisplayName("Success request returns id")
     public void successRequestReturnsId() {
-        Courier courier = new Courier("Testik01", "rwthw4rth", "wrthwrth45");
-        CourierCredentials courierCredentials = new CourierCredentials("Testik01", "rwthw4rth");
-        courierSteps.create(courier).assertThat().statusCode(HTTP_CREATED);
-        courierId = courierSteps.login(courierCredentials).assertThat().statusCode(HTTP_OK).and().body("id", notNullValue()).extract().path("id");
-    }
+        Courier courier = CourierGenerator.getRandom();
+        ValidatableResponse createResponse = courierSteps.create(courier);
+        ValidatableResponse loginResponse = courierSteps.login(CourierCredentials.from(courier));
 
+        courierId = loginResponse.extract().path("id");
+        boolean isValueTrue = createResponse.extract().path("ok");
+        int statusCode = loginResponse.extract().statusCode();
+
+        assertThat("Creating Failed", isValueTrue);
+        assertThat(statusCode, is(HTTP_OK));
+        assertThat(courierId, is(notNullValue()));
+    }
 }

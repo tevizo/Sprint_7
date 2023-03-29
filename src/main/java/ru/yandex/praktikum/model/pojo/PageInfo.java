@@ -1,4 +1,4 @@
-package ru.yandex.praktikum.model.Pojo;
+package ru.yandex.praktikum.model.pojo;
 
 public class PageInfo {
     private int page;
